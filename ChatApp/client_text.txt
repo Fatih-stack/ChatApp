@@ -1,0 +1,119 @@
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include "opencv2/objdetect/objdetect.hpp"
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/videoio.hpp"
+#include <opencv2/video.hpp>
+#include <opencv2/bgsegm.hpp>
+
+#include <iostream>
+#include <vector>
+
+
+using namespace cv;
+using namespace std; 
+int main(void) {
+
+	RNG rng(12345);
+
+	Mat imgFrame1, thres;
+	Mat frame, fgMaskMOG;
+
+	char chCheckFoEscKey = 0;
+	cv::Ptr<BackgroundSubtractor> pMOG = cv::createBackgroundSubtractorMOG2();
+
+	cv::VideoCapture capVideo("PeopleCount.mp4");
+	//capVideo.open("CarsDrivingUnderBridge.mp4");
+
+	if (!capVideo.isOpened()) {                                                 // if unable to open video file
+		std::cout << "error reading video file" << std::endl << std::endl;      // show error message
+		return(0);                                                              // and exit program
+	}
+
+	if (capVido.get(cv::CAP_PROP_FRAME_COUNT) < 2) {
+		std::cout << "error: video file must have at least two frames";
+		return(0);
+	}
+
+	pMOG->apply(frame, fgMaskMOG);
+
+	// for every frame
+	vector<vector<cv::Point>> contours, prev_contours;
+	vector<cv::Point> current_contours, previous_contours;
+	//findContours(maskFrame.clone(), contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+	while (capVideo.isOpened() && chCheckForEscKey != 27) {
+		imgFrame1 = capVideo.read(imgFrame1);
+		frame = capVideo.read(frae);
+		pMOG->apply(frame, fgMaskMOG);
+		try
+		{
+			cv::dilate(fgMaskMOG, thres, NULL);
+			findContours(thres.clone(), contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+			for (vector<cv::Point> item : contours) {
+				if (cv::contourArea(item) < 1000)
+					continue;
+				vector<vector<cv::Point>> contours_poly(contours.size());
+				vector<Rect> boundRect(contours.size());
+
+				for (int i = 0; i < contours.size(); i++)
+				{
+					Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255),rng.uniform(0, 255));
+					drawContours(frame, contours_poly, i, color, 1, 8, vector<Vec4i>(), 0, Point());
+					rectangle(frame, boundRect[i].tl(), boundRect[i].br(), color, 2, 8, 0);
+				}
+			}
+
+			if (prev_contours.size() == 0) {
+				prev_contours = contours;
+			}
+
+			std::vector<int> closestContoursList;
+			int people_in = 0, people_out = 0;
+			for (int i = 0; i < contours.size(); i++)
+			{
+				int minimum = 1000000;
+				int closestContour;
+				for (int k = 0; k < prev_contours.size();k++) {
+					int diff_x = contours[i][0].x - prev_contours[k][0].x;
+					int diff_y = contours[i][1].y - prev_contours[k][1].y;
+
+					int distance = diff_x * diff_x + diff_y * diff_y;
+					if (distance < minimum) {
+						minimum = distance;
+						closestContour = k;
+					}
+					closestContoursList.push_back(closestContour);
+
+				}
+
+			}
+			for (int i = 0; i < contours.size(); i++)
+			{
+				cv::Point y_previous = prev_contours[closestContoursList[i]][0];
+				if (contours[i][1].x < LINE_4 &&y_previous.y > LINE_4)
+					people_out++;
+				if (contours[i][1].x > LINE_4 && y_previous.y < LINE_4)
+					people_in++;
+
+				prev_contours = contours;
+
+				cv::line(frame, Point(0, LINE_4), Point(frame.cols, LINE_4), Scalar(0, 255, 255), 2);
+				cv::putText(frame, "Cıkan " + std::to_string(people_out), Point(10, 50), cv::FONT_HERSHEY_DUPLEX, 1, Scalar(0, 143, 143), 2);
+				cv::putText(frame, "Giren " + std::to_string(people_in), Point(10, 50), cv::FONT_HERSHEY_DUPLEX, 1, Scalar(0, 143, 143), 2);
+				cv::imshow("Frame", frame);
+			}
+
+		}
+		catch (const cv::Exception& e)
+		{
+			cout << e.msg << endl; // output exception message
+		}
+	}
+}urs;
+
+				cv::line(frame, Point(0, LINE_4), Point(frame.cols, LINE_4), Scalar(0, 255, 255), 2);
+				cv::putText(frame, "Cıkan " + std::to_string(people_out), Point(10, 50), cv::FONT_HERSHEY_DUPLEX, 1, Scalar(0, 143, 143), 2);
+				cv::putText(frame, "Giren " + std::to_string(people_in), Point(10, 50), cv::FONT_HERSHEY_DUPLEX, 1, Scalar(0, 143, 143), 2)
