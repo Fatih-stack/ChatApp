@@ -1,17 +1,19 @@
 
 // ChatAppDlg.cpp : implementation file
 //
-#define DEFAULT_BUFLEN 511
+
 #include "pch.h"
 #include "framework.h"
 #include "ChatApp.h"
 #include "ChatAppDlg.h"
 #include "afxdialogex.h"
 #include <string> 
+#include <fstream>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+#define DEFAULT_BUFLEN 511
 
 CChatAppDlg::CChatAppDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(IDD_CHATAPP_DIALOG, pParent)
@@ -49,8 +51,7 @@ END_MESSAGE_MAP()
 BOOL CChatAppDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
-	// Add "About..." menu item to system menu.
-
+	m_client = std::make_shared<Client>();
 	// IDM_ABOUTBOX must be in the system command range.
 	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
 	ASSERT(IDM_ABOUTBOX < 0xF000);
@@ -119,55 +120,56 @@ HCURSOR CChatAppDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+/**********************************************************
+* Make WSA initializations and start connection to server
+* by taking port and ip from gui connects to server
+* send "... is online now" msg to server receive msg from
+* server and shows on GUI
+*********************************************************/
 void CChatAppDlg::OnBnClickedButtonLogin()
 {
 	UpdateData(TRUE);
+	if (Client::initWSA() == false) {
+		AfxMessageBox(_T("Error WSA init!!!"));
+		return;
+	};
 	int port = _ttoi((m_port));
-
-	if (AfxSocketInit() == FALSE)
-	{
-		AfxMessageBox(_T("Socket initialization failed."));
-		return;
-	}
-	
-	if (m_client.Create() == FALSE)
-	{
-		AfxMessageBox(_T("Socket creation failed."));
-		return;
-	}
-	
-	if (m_client.Connect(m_ip, port) == FALSE)
-	{
-		AfxMessageBox(_T("Connection unsuccessful."));
-		return;
-	}
-	m_client.pDlg = this;
+	std::string ip = CT2A(m_ip);
+	m_client->setClientSocket(ip, port);
+	m_client->Connect();
+	//m_client.pDlg = this;
 	CString username;
 	GetDlgItem(IDC_EDIT_NAME)->GetWindowText(username);
-	CString connInfo = username + _T(" is online now.");
+	std::string userName = CT2A(username);
+	std::string connInfo = userName + " is online now.";
 	m_Users.AddString(username);
-	AfxMessageBox(connInfo);
-	int soStr = connInfo.GetLength();
-	char* resultStr = new char[soStr];
-	wsprintfA(resultStr, "%S", connInfo);
-	m_client.Send(resultStr, soStr + 1);
-	delete resultStr;
+	m_client->sendMSG(connInfo.c_str());
+	m_client->receiveMSG();
+	createMessage();
+	m_client->receiveMSG();
+	createMessage();
 }
 
+/****************************************************
+* Close related client socket connection and shows
+* which client is disconnetted as MessageBox
+*****************************************************/
 void CChatAppDlg::OnBnClickedButtonLogout()
 {
 	CString getUsername;
 	GetDlgItem(IDC_EDIT_NAME)->GetWindowText(getUsername);
-	CString makeMsg = getUsername + _T(" is offline now.");
-	int sof = makeMsg.GetLength();
-	char* resultStr = new char[sof];
-	wsprintfA(resultStr, "%S", makeMsg);
-	makeMsg.ReleaseBuffer();
-	m_client.Send(resultStr, sof + 1);
+	std::string userName = CT2A(getUsername);
+	std::string makeMsg = userName + " is offline now.";
 	AfxMessageBox(_T("Client Disconnected. "));
-	m_client.Close();
+	m_client->~Client();
 }
 
+/****************************************************
+* Send message which entered from user on GUI to server
+* by taking username and message creates message format
+* then send to server and receive message from server
+* shows this message on GUI
+*****************************************************/
 void CChatAppDlg::OnBnClickedButtonSend()
 {
 	Client::isFile = false;
@@ -178,14 +180,17 @@ void CChatAppDlg::OnBnClickedButtonSend()
 	CString time = CTime::GetCurrentTime().Format("%H:%M");
 	createMsg = userName + _T(" (@" + time + ") : ") + createMsg;
 
-	int len = createMsg.GetLength();
-	char* result = new char[len];
-	wsprintfA(result, "%S", createMsg);
-	createMsg.ReleaseBuffer();
-	m_client.Send(result, len + 1);
+	std::string result = CT2A(createMsg);
+	m_client->sendMSG(result.c_str());
+	m_client->receiveMSG();
+	createMessage();
 	GetDlgItem(IDC_EDIT_MSG)->SetWindowText(_T(""));
 }
 
+/***************************************************
+* Waits for key press event on GUI and if enter key
+* is pressed in edit control sends message
+****************************************************/
 BOOL CChatAppDlg::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: Add your specialized code here and/or call the base class
@@ -197,6 +202,15 @@ BOOL CChatAppDlg::PreTranslateMessage(MSG* pMsg)
 			OnBnClickedButtonSend();
 		}
 	}
+	else if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_SHIFT && 
+			pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_RETURN)
+	{
+		int idCtrl = this->GetFocus()->GetDlgCtrlID();
+		if (idCtrl == IDC_EDIT_MSG)
+		{
+			GetDlgItem(IDC_EDIT_MSG)->SetWindowText(_T("\r\n"));
+		}
+	}
 	return CDialog::PreTranslateMessage(pMsg);
 }
 
@@ -205,10 +219,16 @@ void CChatAppDlg::OnBnClickedOk()
 	OnBnClickedButtonSend();
 }
 
-void CChatAppDlg::createMessage(CString display) {
-	m_listcntrl.AddString(display);
+//push messages to listbox
+void CChatAppDlg::createMessage() {
+	m_listcntrl.AddString(m_client->display);
 }
 
+/*********************************************************
+* Take file path by opening filedialog and choosing file
+* then Opens file take its contents and send piece piece
+* to server
+*********************************************************/
 void CChatAppDlg::OnBnClickedButtonFile()
 {
 	CFile FileObj;		//Variable for file operations
@@ -217,41 +237,50 @@ void CChatAppDlg::OnBnClickedButtonFile()
 	CFileDialog dlg(FALSE, _T("txt"), NULL, OFN_HIDEREADONLY, szFilter, this);
 	if (dlg.DoModal() == IDOK)
 	{
-		sFilePath = dlg.GetPathName();
+		sFilePath = dlg.GetPathName();		//take filepath with filename
 	}
 	else {
 		return;
 	}
-	file.open((LPCTSTR)sFilePath, std::ios::in | std::ios::binary);
+	std::fstream file;
+	file.open((LPCTSTR)sFilePath, std::ios::in | std::ios::binary);	//open file
 	if (!file.is_open()) {
-		createMessage(_T("[ERROR] : File loading failed, Exititng."));
+		m_client->display = _T("[ERROR] : File loading failed, Exititng.");
+		createMessage();
 		return;
 	}
+	//take file contents
 	std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 	std::string s = std::to_string(contents.length());
 	if (contents.length() > 15728640) {
-		createMessage(_T("[ERROR] : File is too big, couldn't send"));
+		m_client->display = _T("[ERROR] : File is too big, couldn't send");
+		createMessage();
 		return;
 	}
 	std::string str = "File size : " + s;
 	int iResult = 0, len = 0, count = 0, sndbuflen = DEFAULT_BUFLEN;
 	int size = contents.length();
-	m_client.Send(str.c_str(), str.length());
-	while (count < size) {
-		char sndbuf[DEFAULT_BUFLEN+1];
+	//first send "File size : " message to specify file is coming to server
+	m_client->sendMSG(str.c_str());
+	m_client->receiveMSG();		//receive answer from server
+	createMessage();			//shows answer on gui
+	while (count < size) {		//send file piece piece to server until finish
+		char sndbuf[DEFAULT_BUFLEN+1];	//create buff
 		len = min(size - count, sndbuflen);
-		memcpy(sndbuf, contents.data() + count, len);
-		sndbuf[DEFAULT_BUFLEN] = '\0';
+		memcpy(sndbuf, contents.data() + count, len);		//copy given length content to buffer
+		sndbuf[DEFAULT_BUFLEN] = '\0';	//last char
 		// Send a buffer
-		iResult = m_client.Send(sndbuf, len);
-		if(len < 511)
-			createMessage(_T("[LOG] : File Saved.\n"));
-		file.close();
-		Client::file.close();
+		iResult = m_client->sendMSG(sndbuf);	//send server
+		m_client->receiveMSG();					//receive ans
+		createMessage();						//show on listbox
+		if(len < 511){
+			m_client->display = _T("[LOG] : File Saved.\n");
+			createMessage();
+		}
 		// iResult: Bytes sent
 		if (iResult == SOCKET_ERROR) throw WSAGetLastError();
 		else {
-			if (iResult > 0) count += iResult;
+			if (iResult > 0) count += iResult;		//count send bytes
 			else break;
 		}
 	}

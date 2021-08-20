@@ -40,7 +40,7 @@ END_MESSAGE_MAP()
 BOOL CServerDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
-
+	serverCon = std::make_shared<Connection>();
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
@@ -87,19 +87,19 @@ HCURSOR CServerDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+//when start button pressed calls parent thread function
 void CServerDlg::OnBnClickedButton1()
 {
-	m_Thread = AfxBeginThread(pThreadHandler, this);
-	m_threadHandler = m_Thread->m_hThread;
+	m_Thread = std::thread(pThreadHandler, this);
 }
 
 
 void CServerDlg::OnBnClickedButton2()
 {
-	delete svrCon;
 	CDialog::OnCancel();
 }
 
+//thread handler make castings to call parent thread function
 UINT __cdecl CServerDlg::pThreadHandler(LPVOID pParam)
 {
 	CServerDlg* pYourClass = reinterpret_cast<CServerDlg*>(pParam);
@@ -107,22 +107,27 @@ UINT __cdecl CServerDlg::pThreadHandler(LPVOID pParam)
 	return 0;
 }
 
+//add updates to server gui
 void CServerDlg::dispUpdate(CString str)
 {
 	m_ServerList.AddString(str);
 }
 
+/***********************************************************
+* take port number and make connections according to Connect
+* function in Connection class
+************************************************************/
 UINT CServerDlg::pThreadFunc()
 {
 	CString portStr;
-	svrCon = new Connection(this);
+	
 	GetDlgItem(IDC_EDIT2)->GetWindowText(portStr);
 	int portNum = _ttoi(portStr);
 	CString statusOne = (_T("Server initiated. Waiting for clients."));
 	m_ServerList.AddString(statusOne);
 	GetDlgItem(IDC_BUTTON1)->EnableWindow(false);
 	GetDlgItem(IDC_BUTTON2)->EnableWindow(true);
-	svrCon->Connect(portNum);
+	serverCon->Connect(portNum);
 	return 0;
 
 

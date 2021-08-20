@@ -2,21 +2,27 @@
 #include "Connection.h"
 #include "Server.h"
 #include "ServerDlg.h"
-#include "unordered_map"
+#include <memory>
 
 static SOCKET m_ClientSockets[100];
 static int m_Clients;
-Connection::Connection(CServerDlg* pDlg)
+Connection::Connection()
 {
-	m_pDialog = pDlg;
 }
 
+//close socket and clean WSA
 Connection::~Connection()
 {
 	closesocket(m_serverSocket);
 	WSACleanup();
 }
 
+/**********************************************************************
+* initializes WSA and create socket set ip and port numbers
+* and bind then start to listen clients wait for clients to connect
+* if any client is connected take its value make arrangements
+* calls child thread function assign client socket num to thread array
+**********************************************************************/
 void Connection::Connect(int nPort)
 {
 	int res;
@@ -61,16 +67,12 @@ void Connection::Connect(int nPort)
 		inet_ntop(AF_INET, &cCon->sin_addr, inIPad, sizeof(inIPad));
 		CString IPadv(inIPad);
 		CString portVal;
-		m_pDialog->GetDlgItem(IDC_EDIT2)->GetWindowText(portVal);
-		CString t = CTime::GetCurrentTime().Format("%H:%M");
-		CString stat = IPadv + " is connected on " + portVal + " [Time stamp: " + t + "]";
-		m_pDialog->dispUpdate(stat);
 
 		//Starting child thread whenever client connection is accepted//
-		m_cTh = AfxBeginThread(childThreadFunc, (LPVOID)m_clientSocket);
 		++m_Clients;
+		std::thread thread(childThreadFunc, (LPVOID)m_clientSocket);
+		thread.join();
 		m_ClientSockets[m_Clients] = m_clientSocket;
-
 	}
 
 	if (!m_clientSocket)
@@ -80,6 +82,10 @@ void Connection::Connect(int nPort)
 	}
 }
 
+/**************************************************************************
+* take socket number by casting if first connection sends default message
+* waits for incoming message after receive message send all clients
+***************************************************************************/
 UINT __cdecl Connection::childThreadFunc(LPVOID pParam)
 {
 	SOCKET pYourSocket = reinterpret_cast<SOCKET>(pParam);
@@ -89,12 +95,13 @@ UINT __cdecl Connection::childThreadFunc(LPVOID pParam)
 	send(pYourSocket, sendBuff, strlen(sendBuff), 0);
 	while ((recv(pYourSocket, recvBuff, 512, 0)) != SOCKET_ERROR)
 	{
-		int size = strlen(recvBuff) - 1;
+		int size = strlen(recvBuff);
 		if (size > 512) size = 512;
 		recvBuff[size] = '\0';
 		//Broadcast to all clients//
 		for (int brdcst = 1; brdcst <= m_Clients; brdcst++)
 			send(m_ClientSockets[brdcst], recvBuff, strlen(recvBuff), 0);
 	}
+//	delete sendBuff;
 	return 0;
 }

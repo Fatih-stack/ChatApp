@@ -1,14 +1,21 @@
 #pragma once
-#include <afxsock.h>            // MFC socket extensions
-#include <fstream>
-class Client : public CSocket
+#include <afxsock.h> 
+#include <string>
+
+class Client
 {
 public:
+	SOCKET m_socketId;
+	SOCKADDR_IN m_ServerAddr{};
+	static bool m_isInitWsa, isFile;
+	CString display;
 	Client();
+	void setClientSocket(std::string ip, int port);
 	virtual ~Client();
-	CDialog* pDlg;
-	virtual void OnReceive(int nErrorCode);
-	static bool isFile;
-	static std::fstream file;
+	static bool initWSA();
+	void destroyWSA();
+	bool receiveMSG();
+	int sendMSG(const char* buffer) const;
+	void Connect() const;
 };
 

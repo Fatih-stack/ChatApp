@@ -7,6 +7,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ChatApp", "ChatApp\ChatApp.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcxproj", "{1D16C39C-79CB-48AC-8B97-D9EFFF16631A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{747BB76E-94C5-48D5-8784-A74DBBD52A3B}"
+	ProjectSection(SolutionItems) = preProject
+		Socket\Socket.cpp = Socket\Socket.cpp
+		Socket\Socket.h = Socket\Socket.h
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

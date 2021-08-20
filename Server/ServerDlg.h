@@ -4,15 +4,15 @@
 
 #pragma once
 #include "Connection.h"
-
+#include <memory>
 
 // CServerDlg dialog
 class CServerDlg : public CDialog
 {
 private:
+	std::thread m_Thread;
 	HANDLE m_threadHandler;
-	CWinThread* m_Thread;
-
+	
 // Construction
 public:
 	CServerDlg(CWnd* pParent = nullptr);	// standard constructor
@@ -42,6 +42,6 @@ public:
 	afx_msg void OnBnClickedButton2();
 	CEdit m_port;
 	CListBox m_ServerList;
-	Connection* svrCon;
+	std::shared_ptr<Connection> serverCon;
 	afx_msg void OnEnChangeEdit2();
 };

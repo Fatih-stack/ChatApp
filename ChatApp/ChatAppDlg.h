@@ -3,12 +3,8 @@
 //
 
 #pragma once
-#pragma comment(lib, "Ws2_32.lib")
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-
-#include <WinSock2.h>
 #include "Client.h"
-#include <fstream>
+#include <memory>
 
 // CChatAppDlg dialog
 class CChatAppDlg : public CDialog
@@ -41,7 +37,7 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
-	void createMessage(CString sDisplay);
+	void createMessage();
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedButtonLogin();
 	afx_msg void OnBnClickedButtonLogout();
@@ -53,9 +49,7 @@ public:
 	CString m_userName;
 	CListBox m_listcntrl;
 	CString m_msgcntrl;
-	Client m_client;
-	int nClientSocket;
-	std::fstream file;
+	std::shared_ptr<Client> m_client{};
+	int m_ClientSocket;
 	CListBox m_Users;
-	SOCKADDR_IN srv;
 };
